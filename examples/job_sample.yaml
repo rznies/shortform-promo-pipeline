@@ -1,0 +1,56 @@
+project_name: "Rent A Boyfriend & Broken Soldier Promo Batch"
+drive_folder_id: "1-J4YGvIjWVbEh_GpVqjqzSEnoF_3s9uk"
+export_folder_id: "1t8DXgEzvRfEo8ODp1fzu53tb1t9ejg3Z"
+output_directory: "./exports"
+jobs:
+  - promo_id: "FDED1026FR"
+    show_name: "Rent A Boyfriend"
+    language: "fr"
+    recipe: "vo_promo"
+    input_promo_path: "./workspace/FDED1026FR.mp4"
+    output_filename: "editor_6299660736_FDED1026FR.mp4"
+    watermark:
+      enabled: true
+      x: 40
+      y: 90
+      width: 640
+      height: 180
+      blur_radius: 18
+    logo:
+      file_path: "./workspace/logo_french.mov"
+      x: 40
+      y: 100
+      scale: 1.0
+    audio_vo:
+      file_path: "./workspace/FDED1026_fr-FR_dubbed.mp4"
+      duration_seconds: 24.5
+      volume: 1.0
+    subtitles:
+      enabled: true
+      script_path: "./workspace/FDED1026FR.docx"
+      font_name: "Arial"
+      font_size: 64
+      margin_v: 420
+    cta:
+      file_path: "./workspace/cta_french.mp4"
+
+  - promo_id: "FDED572FR"
+    show_name: "Rent A Boyfriend"
+    language: "fr"
+    recipe: "cliffhanger"
+    input_promo_path: "./workspace/FDED572FR.mp4"
+    output_filename: "editor_6299660736_FDED572FR.mp4"
+    watermark:
+      enabled: true
+      x: 40
+      y: 90
+      width: 640
+      height: 180
+      blur_radius: 18
+    logo:
+      file_path: "./workspace/logo_french.mov"
+      x: 40
+      y: 100
+      scale: 1.0
+    cta:
+      file_path: "./workspace/cta_french.mp4"

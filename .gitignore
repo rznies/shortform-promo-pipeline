@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Modal
+.modal.toml
+
+# Media & Temporary Working Dirs
+workspace/
+downloads/
+exports/
+temp/
+*.mp4
+*.mov
+*.wav
+*.m4a
+*.png
+*.jpg
+*.jpeg
+!examples/**/*.mp4
+!examples/**/*.png
+
+# Subtitles & drafts
+*.ass
+*.srt
+!examples/**/*.srt
+!examples/**/*.ass
+
+# IDEs & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
