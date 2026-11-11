@@ -195,6 +195,10 @@ def render_promo_worker(job: dict) -> dict:
             prev_gray = gray
     cap.release()
 
+    if pid == "FDED1026FR":
+        # Target ~48.7s total finished promo as specified by client brief
+        cta_cut_t = 41.25
+
     print(f"[{pid}] Duration: {dur:.2f}s | CTA Cut Point: {cta_cut_t:.2f}s (Diff: {max_diff:.1f})")
 
     # 4. Handle Subtitles and Voiceover
@@ -215,17 +219,34 @@ def render_promo_worker(job: dict) -> dict:
     # 5. Build Standard Compliant FFmpeg Filter Graph
     out_mp4 = os.path.join(work_dir, "output.mp4")
 
+    # Complete edge-to-edge header mask covering original title and platform logo
+    header_clean = """
+    [v_main]split[v_base][v_crop];
+    [v_crop]crop=1020:200:30:60,boxblur=24:3[v_blurred];
+    [v_base][v_blurred]overlay=x=30:y=60[v_hdr_clean];
+    """
+
+    # Subtitle cleaning filter for VO promos: soften underlying English subs during VO hook
     if has_vo:
         vo_dur = job["vo_dur"] or 20.0
-        if abs(cta_cut_t - vo_dur) < 8.0:
-            # Full VO promo cut
+        sub_prefilter = f"""
+        [v_hdr_clean]split[v_s1][v_s2];
+        [v_s2]crop=960:220:60:1300,boxblur=22:3[v_sblur];
+        [v_s1][v_sblur]overlay=60:1300:enable='between(t,0,{vo_dur:.2f})'[v_clean];
+        """
+    else:
+        sub_prefilter = "[v_hdr_clean]null[v_clean];"
+
+    if has_vo:
+        vo_dur = job["vo_dur"] or 20.0
+        if abs(cta_cut_t - vo_dur) < 12.0 or pid == "FDED1026FR":
+            # Full VO promo cut: sync audio and video perfectly
             fg = f"""
             [0:v]trim=0:{cta_cut_t:.3f},setpts=PTS-STARTPTS,fps=30,scale=1080:1920,setsar=1[v_main];
-            [v_main]split[v_base][v_crop];
-            [v_crop]crop=w=750:h=200:x=40:y=80,boxblur=18:3[v_blurred];
-            [v_base][v_blurred]overlay=x=40:y=80[v_clean];
+            {header_clean}
+            {sub_prefilter}
             [v_clean]subtitles='{ass_path}'[v_sub];
-            [v_sub][2:v]overlay=0:0:format=auto:shortest=1[v_p1];
+            [v_sub][2:v]overlay=0:-93:shortest=1[v_p1];
             [1:a]atrim=0:{cta_cut_t:.3f},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a_p1];
             [3:v]fps=30,scale=1080:1920,setsar=1,setpts=PTS-STARTPTS[v_cta];
             [3:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[a_cta];
@@ -235,11 +256,10 @@ def render_promo_worker(job: dict) -> dict:
             # VO Hook at beginning, native drama audio continues in middle
             fg = f"""
             [0:v]trim=0:{cta_cut_t:.3f},setpts=PTS-STARTPTS,fps=30,scale=1080:1920,setsar=1[v_main];
-            [v_main]split[v_base][v_crop];
-            [v_crop]crop=w=750:h=200:x=40:y=80,boxblur=18:3[v_blurred];
-            [v_base][v_blurred]overlay=x=40:y=80[v_clean];
+            {header_clean}
+            {sub_prefilter}
             [v_clean]subtitles='{ass_path}'[v_sub];
-            [v_sub][2:v]overlay=0:0:format=auto:shortest=1[v_p1];
+            [v_sub][2:v]overlay=0:-93:shortest=1[v_p1];
             [1:a]volume=1.0[vo_aud];
             [0:a]atrim=start={vo_dur:.3f}:end={cta_cut_t:.3f},asetpts=PTS-STARTPTS[mid_aud];
             [vo_aud][mid_aud]concat=n=2:v=0:a=1,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a_p1];
@@ -257,10 +277,8 @@ def render_promo_worker(job: dict) -> dict:
         # Case B: Pure Drama Cliffhanger
         fg = f"""
         [0:v]trim=0:{cta_cut_t:.3f},setpts=PTS-STARTPTS,fps=30,scale=1080:1920,setsar=1[v_main];
-        [v_main]split[v_base][v_crop];
-        [v_crop]crop=w=750:h=200:x=40:y=80,boxblur=18:3[v_blurred];
-        [v_base][v_blurred]overlay=x=40:y=80[v_clean];
-        [v_clean][1:v]overlay=0:0:format=auto:shortest=1[v_p1];
+        {header_clean}
+        [v_hdr_clean][1:v]overlay=0:-93:shortest=1[v_p1];
         [0:a]atrim=0:{cta_cut_t:.3f},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a_p1];
         [2:v]fps=30,scale=1080:1920,setsar=1,setpts=PTS-STARTPTS[v_cta];
         [2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[a_cta];
@@ -340,6 +358,19 @@ def main():
     t_start = time.time()
     results = []
 
+    DRIVE_FILE_IDS = {
+        "rajniesh_6299660736_FDDCE789FR.mp4": "1TaFYUHeIXe2Rcs7y94QMaVJ4frrL2jSO",
+        "rajniesh_6299660736_FDDEX041FR.mp4": "1iDzqWdoyUeuOkh1K-Iab1ZVO4uj9aPBR",
+        "rajniesh_6299660736_FDEA458JP.mp4":  "1cAUZaIBIY8RzrP0tCSs3voEpVWQ5LHRu",
+        "rajniesh_6299660736_FDEA645JP.mp4":  "1PnlQqPUiZ-xlMy60EP2AzG5jqMLDFdij",
+        "rajniesh_6299660736_FDED1026FR.mp4": "1fGmwzoHhEb7s40-2SzF9vjVjfWx91Ov-",
+        "rajniesh_6299660736_FDED1028FR.mp4": "1fgYUCXUt_nds0Q-k17LbrfzOLhSeQNC8",
+        "rajniesh_6299660736_FDED470FR.mp4":  "1Wtf1isla6VViHgoAqmM_qMcgxfIU5GNi",
+        "rajniesh_6299660736_FDED572FR.mp4":  "1zwAz-dgs8YpqtFBgOfhFTMlaqKsVS-Or",
+        "rajniesh_6299660736_FDED806FR.mp4":  "1CgPiEv6PdqkauPfwk3PYVM4U8NePzX5m",
+        "rajniesh_6299660736_FDEH571FR.mp4":  "1bFNadu0-enYOpM19IH4ARVdN7e7Ah4bJ",
+    }
+
     # Parallel execution across 10 cloud containers
     for res in render_promo_worker.map(prepared_jobs):
         pid = res["id"]
@@ -355,11 +386,21 @@ def main():
         print(f"\n✓ [Modal Cloud] Finished {pid}: {size_mb} MB | Duration: {dur}s")
         print(f"  📁 Local file saved: {out_path}")
 
-        # Upload directly to Google Drive '4. Exports' folder
-        print(f"  ☁️  Uploading {fname} to Google Drive '4. Exports' ({exports_folder_id})...")
-        cmd_up = ["gdrive", "mutate", "upload", out_path, "--parent", exports_folder_id]
-        up_res = subprocess.run(cmd_up, capture_output=True, text=True, shell=(os.name == "nt"))
-        print(f"  ✓ Drive status: {up_res.stdout.strip() or 'Uploaded successfully'}")
+        # Update or Upload directly to Google Drive '4. Exports' folder
+        drive_fid = DRIVE_FILE_IDS.get(fname)
+        if drive_fid:
+            print(f"  ☁️  Updating {fname} (ID: {drive_fid}) in Google Drive '4. Exports'...")
+            cmd_up = ["gdrive", "mutate", "update", drive_fid, out_path]
+            up_res = subprocess.run(cmd_up, capture_output=True, text=True, shell=(os.name == "nt"))
+            if up_res.returncode != 0:
+                print(f"  ⚠️  In-place update failed, falling back to upload...")
+                cmd_up = ["gdrive", "mutate", "upload", out_path, "--parent", exports_folder_id]
+                up_res = subprocess.run(cmd_up, capture_output=True, text=True, shell=(os.name == "nt"))
+        else:
+            print(f"  ☁️  Uploading {fname} to Google Drive '4. Exports' ({exports_folder_id})...")
+            cmd_up = ["gdrive", "mutate", "upload", out_path, "--parent", exports_folder_id]
+            up_res = subprocess.run(cmd_up, capture_output=True, text=True, shell=(os.name == "nt"))
+        print(f"  ✓ Drive status: {up_res.stdout.strip() or 'Updated successfully'}")
 
         results.append({
             "id": pid,
